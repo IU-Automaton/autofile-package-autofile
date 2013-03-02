@@ -2,7 +2,8 @@
 
 'use strict';
 
-var fs = require('fs');
+var fs   = require('fs');
+var path = require('path');
 
 var task = {
     id: 'package-autofile',
@@ -15,13 +16,12 @@ var task = {
         },
         'options-intro': {
             description: 'The text that is shown before the options.',
-            default: 'Here\'s a list of the options that this task can take:'
+            default:     'Here\'s a list of the options that this task can take:'
         }
     },
 
     setup: function (opt, ctx, next) {
-        opt.autofile = require(opt.autofile);
-
+        opt.task      = require(path.resolve(opt.autofile));
         opt.__dirname = __dirname;
 
         next();
@@ -29,6 +29,7 @@ var task = {
 
     tasks: [
         {
+            description: 'Copy template README.md file',
             task: 'cp',
             options: {
                 files: {
@@ -37,27 +38,29 @@ var task = {
             }
         },
         {
+            description: 'Replace overall info in README.md',
             task: 'scaffolding-replace',
             options: {
                 files: 'README.md',
                 data: {
-                    id:              '{{autofile.id}}',
-                    name:            '{{autofile.name}}',
-                    description:     '{{autofile.description}}',
-                    author:          '{{autofile.author}}',
+                    id:              '{{task.id}}',
+                    name:            '{{task.name}}',
+                    description:     '{{task.description}}',
+                    author:          '{{task.author}}',
                     'options-intro': '{{options-intro}}'
                 }
 
             }
         },
         {
-            on: '{{autofile.options}}',
+            description: 'Generate options list',
+            on: '{{task.options}}',
             task: function (opt, ctx, next) {
                 var options = '';
                 var def;
-                for (var optionName in opt.autofile.options) {
+                for (var optionName in opt.task.options) {
                     
-                    def = opt.autofile.options[optionName].default;
+                    def = opt.task.options[optionName].default;
                     switch (typeof def) {
                     case 'string':
                         def = '"' + def + '"';
@@ -66,11 +69,11 @@ var task = {
                         def = def ? 'true' : 'false';
                     }
                     // put option name and possibly flag of mandatory
-                    options += '- **' + optionName + (def === undefined ? '*' : '') + '**';
+                    options += '- `' + (def === undefined ? '*' : '') + optionName + '`';
                     // put default if it exists
-                    options += (def !== undefined ? '*(' + opt.autofile.options[optionName].default + ')*' : '');
+                    options += (def !== undefined ? ' *(' + opt.task.options[optionName].default + ')*' : '');
                     // put description
-                    options += ': ' + opt.autofile.options[optionName].description + '\n';
+                    options += ': ' + opt.task.options[optionName].description + '\n';
                 }
 
                 opt.optionsList = options;
@@ -79,13 +82,33 @@ var task = {
             }
         },
         {
-            on: '{{autofile.options}}',
+            description: 'Put options in README.md',
+            on: '{{task.options}}',
             task: 'scaffolding-replace',
             options: {
                 files: 'README.md',
                 data: {
                     options: '{{optionsList}}'
                 }
+            }
+        },
+        {
+            description: 'Setup package.json with the task info',
+            task: function (opt, ctx, next) {
+                if (!fs.existsSync('./package.json')) {
+                    ctx.log.warnln('No "package.json" file found. It\'s good practice to create one.');
+
+                    return next();
+                }
+
+                var pkg         = require(path.resolve('./package.json'));
+                pkg.name        = 'autofile-' + opt.task.id;
+                pkg.description = opt.task.description;
+                pkg.author      = opt.task.author;
+                pkg.main        = path.basename(opt.autofile);
+                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, '  '));
+
+                next();
             }
         }
     ]

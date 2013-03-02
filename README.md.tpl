@@ -1,12 +1,12 @@
-`automaton task` - http://indigounited.com/automaton
-
 # {{name}} ({{id}})
 
 {{description}}
 
 *{{author}}*
 
-----------------------------------------
+`automaton task` - http://indigounited.com/automaton
+
+--------------------------------------------------------------------------------
 
 ## Introduction
 
